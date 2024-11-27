@@ -25,19 +25,28 @@ defmodule ExAudit.Queryable do
       )
 
     # TODO what do when we get a query
+    schema = Map.get(struct, :__struct__)
+
+    [primary_key] = schema.__schema__(:primary_key)
+    uuid = Map.get(struct, primary_key)
 
     query =
-      case struct do
-        # %Ecto.Query{from: struct} ->
-        #   from v in query,
-        #     where: v.entity_id == subquery(from q in struct, select: q.id),
-        #     where: v.entity_schema == ^struct
-        %{__struct__: struct, id: id} when nil not in [struct, id] ->
+      case {is_struct(struct), is_binary(uuid)} do
+        {true, true} ->
           from(
             v in query,
-            where: v.entity_id == ^id,
+            where: v.entity_id == ^uuid,
+            where: v.entity_schema == ^schema
+          )
+
+        {true, false} ->
+          from(
+            v in query,
             where: v.entity_schema == ^struct
           )
+
+        _ ->
+          query
       end
 
     versions = Ecto.Repo.Queryable.all(module, query, Ecto.Repo.Supervisor.tuplet(module, opts))
@@ -76,11 +85,11 @@ defmodule ExAudit.Queryable do
 
   def history_query(%{id: id, __struct__: struct}) do
     from(
-        v in version_schema(),
-        where: v.entity_id == ^id,
-        where: v.entity_schema == ^struct,
-        order_by: [desc: :recorded_at]
-      )
+      v in version_schema(),
+      where: v.entity_id == ^id,
+      where: v.entity_schema == ^struct,
+      order_by: [desc: :recorded_at]
+    )
   end
 
   @drop_fields [:__meta__, :__struct__]
@@ -148,7 +157,7 @@ defmodule ExAudit.Queryable do
         _ -> res
       end
     else
-      Logger.warn([
+      Logger.warning([
         "Can't revert ",
         inspect(version),
         " because the entity would still be deleted"
