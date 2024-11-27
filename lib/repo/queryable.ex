@@ -26,23 +26,21 @@ defmodule ExAudit.Queryable do
 
     # TODO what do when we get a query
     schema = Map.get(struct, :__struct__)
-
-    [primary_key] = schema.__schema__(:primary_key)
-    uuid = Map.get(struct, primary_key)
+    entity_id = get_entity_id(schema, struct)
 
     query =
-      case {is_struct(struct), is_binary(uuid)} do
+      case {is_struct(struct), is_binary(entity_id)} do
         {true, true} ->
           from(
             v in query,
-            where: v.entity_id == ^uuid,
+            where: v.entity_id == ^entity_id,
             where: v.entity_schema == ^schema
           )
 
         {true, false} ->
           from(
             v in query,
-            where: v.entity_schema == ^struct
+            where: v.entity_schema == ^schema
           )
 
         _ ->
@@ -194,4 +192,15 @@ defmodule ExAudit.Queryable do
   defp reverse_action(:updated), do: :updated
   defp reverse_action(:created), do: :deleted
   defp reverse_action(:deleted), do: :created
+
+  defp get_entity_id(schema, struct) do
+    [primary_key] = schema.__schema__(:primary_key)
+    entity_id = Map.get(struct, primary_key)
+
+    if is_integer(entity_id) do
+      Integer.to_string(entity_id)
+    else
+      entity_id
+    end
+  end
 end
