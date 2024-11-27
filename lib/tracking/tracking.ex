@@ -37,6 +37,7 @@ defmodule ExAudit.Tracking do
           []
 
         patch ->
+          # to check Version.entity_id type in the database
           entity_id = get_entity_id(schema, old, new)
 
           params = %{
