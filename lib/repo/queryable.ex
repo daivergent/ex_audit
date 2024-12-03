@@ -194,7 +194,15 @@ defmodule ExAudit.Queryable do
   defp reverse_action(:deleted), do: :created
 
   defp get_entity_id(schema, struct) do
-    [primary_key] = schema.__schema__(:primary_key)
+    primary_key =
+      case schema.__schema__(:primary_key) do
+        primary_key_list when is_list(primary_key_list) ->
+          List.first(primary_key_list)
+
+        _ ->
+          nil
+      end
+
     entity_id = Map.get(struct, primary_key)
 
     if is_integer(entity_id) do

@@ -130,7 +130,15 @@ defmodule ExAudit.Tracking do
   end
 
   defp get_entity_id(schema, old, new) do
-    [primary_key] = schema.__schema__(:primary_key)
+    primary_key =
+      case schema.__schema__(:primary_key) do
+        primary_key_list when is_list(primary_key_list) ->
+          List.first(primary_key_list)
+
+        _ ->
+          nil
+      end
+
     entity_id = Map.get(old, primary_key) || Map.get(new, primary_key)
 
     if is_integer(entity_id) do
