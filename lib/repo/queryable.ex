@@ -25,19 +25,26 @@ defmodule ExAudit.Queryable do
       )
 
     # TODO what do when we get a query
+    schema = Map.get(struct, :__struct__)
+    entity_id = get_entity_id(schema, struct)
 
     query =
-      case struct do
-        # %Ecto.Query{from: struct} ->
-        #   from v in query,
-        #     where: v.entity_id == subquery(from q in struct, select: q.id),
-        #     where: v.entity_schema == ^struct
-        %{__struct__: struct, id: id} when nil not in [struct, id] ->
+      case {is_struct(struct), is_binary(entity_id)} do
+        {true, true} ->
           from(
             v in query,
-            where: v.entity_id == ^id,
-            where: v.entity_schema == ^struct
+            where: v.entity_id == ^entity_id,
+            where: v.entity_schema == ^schema
           )
+
+        {true, false} ->
+          from(
+            v in query,
+            where: v.entity_schema == ^schema
+          )
+
+        _ ->
+          query
       end
 
     versions = Ecto.Repo.Queryable.all(module, query, Ecto.Repo.Supervisor.tuplet(module, opts))
@@ -76,11 +83,11 @@ defmodule ExAudit.Queryable do
 
   def history_query(%{id: id, __struct__: struct}) do
     from(
-        v in version_schema(),
-        where: v.entity_id == ^id,
-        where: v.entity_schema == ^struct,
-        order_by: [desc: :recorded_at]
-      )
+      v in version_schema(),
+      where: v.entity_id == ^id,
+      where: v.entity_schema == ^struct,
+      order_by: [desc: :recorded_at]
+    )
   end
 
   @drop_fields [:__meta__, :__struct__]
@@ -148,7 +155,7 @@ defmodule ExAudit.Queryable do
         _ -> res
       end
     else
-      Logger.warn([
+      Logger.warning([
         "Can't revert ",
         inspect(version),
         " because the entity would still be deleted"
@@ -185,4 +192,23 @@ defmodule ExAudit.Queryable do
   defp reverse_action(:updated), do: :updated
   defp reverse_action(:created), do: :deleted
   defp reverse_action(:deleted), do: :created
+
+  defp get_entity_id(schema, struct) do
+    primary_key =
+      case schema.__schema__(:primary_key) do
+        primary_key_list when is_list(primary_key_list) ->
+          List.first(primary_key_list)
+
+        _ ->
+          nil
+      end
+
+    entity_id = Map.get(struct, primary_key)
+
+    if is_integer(entity_id) do
+      Integer.to_string(entity_id)
+    else
+      entity_id
+    end
+  end
 end

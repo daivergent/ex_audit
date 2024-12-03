@@ -37,8 +37,11 @@ defmodule ExAudit.Tracking do
           []
 
         patch ->
+          # to check Version.entity_id type in the database
+          entity_id = get_entity_id(schema, old, new)
+
           params = %{
-            entity_id: Map.get(old, :id) || Map.get(new, :id),
+            entity_id: entity_id,
             entity_schema: schema,
             patch: patch,
             action: action
@@ -124,5 +127,24 @@ defmodule ExAudit.Tracking do
 
   defp version_schema do
     Application.get_env(:ex_audit, :version_schema)
+  end
+
+  defp get_entity_id(schema, old, new) do
+    primary_key =
+      case schema.__schema__(:primary_key) do
+        primary_key_list when is_list(primary_key_list) ->
+          List.first(primary_key_list)
+
+        _ ->
+          nil
+      end
+
+    entity_id = Map.get(old, primary_key) || Map.get(new, primary_key)
+
+    if is_integer(entity_id) do
+      Integer.to_string(entity_id)
+    else
+      entity_id
+    end
   end
 end
